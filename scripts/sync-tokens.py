@@ -6,11 +6,45 @@ directly into OpenCode credentials (~/.local/share/opencode/auth.json)
 and Antigravity Accounts storage (~/.config/opencode/antigravity-accounts.json).
 """
 
+import glob
 import json
 import os
+import re
 import sys
 import time
+import urllib.parse
 import urllib.request
+
+def get_antigravity_oauth_client():
+    """
+    Dynamically loads OAuth Client ID and Secret from the installed
+    opencode-antigravity-auth plugin constants.js to avoid storing secrets in git.
+    """
+    home = os.path.expanduser("~")
+    search_dirs = [
+        os.path.join(home, ".cache/opencode/packages"),
+        os.path.join(home, ".opencode"),
+        os.path.join(home, ".config/opencode"),
+    ]
+    for sdir in search_dirs:
+        if not os.path.isdir(sdir):
+            continue
+        for path in glob.glob(os.path.join(sdir, "**/constants.js"), recursive=True):
+            if "node_modules/opencode-antigravity-auth/dist/src/constants.js" in path:
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        c = f.read()
+                        cid = re.search(r'ANTIGRAVITY_CLIENT_ID\s*=\s*["\']([^"\']+)', c)
+                        csec = re.search(r'ANTIGRAVITY_CLIENT_SECRET\s*=\s*["\']([^"\']+)', c)
+                        if cid and csec:
+                            return cid.group(1), csec.group(1)
+                except Exception:
+                    pass
+
+    return (
+        os.environ.get("ANTIGRAVITY_CLIENT_ID"),
+        os.environ.get("ANTIGRAVITY_CLIENT_SECRET"),
+    )
 
 def main():
     token_path = os.path.expanduser("~/.gemini/antigravity-cli/antigravity-oauth-token")
@@ -34,6 +68,33 @@ def main():
         print("[-] Refresh token tidak ditemukan di token agy.", file=sys.stderr)
         sys.exit(1)
 
+    client_id, client_secret = get_antigravity_oauth_client()
+    now_ms = int(time.time() * 1000)
+    expires_at = 0
+
+    if client_id and client_secret:
+        try:
+            data_post = urllib.parse.urlencode({
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+                "client_id": client_id,
+                "client_secret": client_secret,
+            }).encode("utf-8")
+            req_token = urllib.request.Request(
+                "https://oauth2.googleapis.com/token",
+                data=data_post,
+                headers={"Content-Type": "application/x-www-form-urlencoded"}
+            )
+            with urllib.request.urlopen(req_token, timeout=10) as resp:
+                token_payload = json.loads(resp.read().decode("utf-8"))
+                access_token = token_payload.get("access_token", access_token)
+                expires_in = token_payload.get("expires_in", 3600)
+                expires_at = now_ms + (expires_in * 1000)
+                print("[+] Token OAuth berhasil di-refresh langsung ke Google.")
+        except Exception as e:
+            print(f"[*] Warning: Token refresh langsung gagal ({e}), mengatur expiry=0 untuk auto-refresh.", file=sys.stderr)
+            expires_at = 0
+
     # Dapatkan email akun dari tokeninfo Google
     email = "antigravity-user@gmail.com"
     if access_token:
@@ -48,8 +109,6 @@ def main():
             pass
 
     project_id = "rising-fact-p41fc"
-    now_ms = int(time.time() * 1000)
-    expires_at = now_ms + (3600 * 1000)
 
     # 1. Update ~/.local/share/opencode/auth.json
     auth_dir = os.path.expanduser("~/.local/share/opencode")

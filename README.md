@@ -66,6 +66,13 @@ Sebelum integrasi ini dibuat, terdapat beberapa kendala ketika mencoba menghubun
    - Di `agy`, slot Flash terbaru dinamai *Gemini 3.8 Flash*, sementara model backend dasarnya adalah `gemini-3-flash` dengan parameter thinking.
    *Solusi*: Model `antigravity-gemini-3.8-flash` didaftarkan ke `opencode.json` dan dipetakan di resolver.
 
+4. **Endpoint Fallback Poisoning & Quota Exhaustion Lock (Penyebab 'No Response' / Hang)**:
+   - Plugin bawaan menyertakan 3 endpoint fallback: `daily` sandbox, `autopush` sandbox, dan `prod` (`cloudcode-pa.googleapis.com`).
+   - Token Antigravity milik akun pengguna hanya memiliki otorisasi kuota pada endpoint Sandbox Daily. Endpoint `autopush` mengembalikan `403 Forbidden` dan endpoint `prod` mengembalikan `429 Quota Exhausted`.
+   - Ketika plugin mengalami retry atau jeda, ia mencoba fallback ke `prod` yang memicu status `QUOTA_EXHAUSTED` palsu. Akibatnya akun terkunci (*backoff cooldown*) hingga 300 detik (5 menit), membuat OpenCode seolah-olah "no response" atau hanging lama.
+   *Solusi*: `patch-model-resolver.py` membatasi fallback HANYA ke Sandbox Daily (`https://daily-cloudcode-pa.sandbox.googleapis.com`), memprioritaskan endpoint daily untuk project discovery, dan menyediakan `antigravity.json` dengan fail-fast timeouts (15 detik) serta disk debug logging.
+
+
 ---
 
 ## 📦 Persyaratan Sistem
@@ -256,10 +263,11 @@ opencode-antigravity-setup/
 ├── LICENSE                       # Lisensi MIT
 ├── .gitignore                    # Mengabaikan file token & log sensitif
 ├── config/
-│   └── opencode.json             # File konfigurasi acuan untuk ~/.config/opencode/opencode.json
+│   ├── opencode.json             # Model profile definitions untuk ~/.config/opencode/opencode.json
+│   └── antigravity.json          # Tuning stabilitas & timeout untuk ~/.config/opencode/antigravity.json
 └── scripts/
-    ├── sync-tokens.py            # Skrip sinkronisasi token OAuth agy -> OpenCode
-    └── patch-model-resolver.py   # Skrip patch model resolver plugin
+    ├── sync-tokens.py            # Skrip sinkronisasi & refresh token OAuth agy -> OpenCode
+    └── patch-model-resolver.py   # Skrip patch model resolver & stabilitas endpoint plugin
 ```
 
 ---

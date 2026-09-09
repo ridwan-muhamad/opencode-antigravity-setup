@@ -28,22 +28,32 @@ echo "[+] Token Antigravity (agy) terdeteksi!"
 echo "[*] Memasang plugin opencode-antigravity-auth..."
 opencode plugin -g opencode-antigravity-auth@latest || true
 
-# 4. Salin konfigurasi opencode.json
+# 4. Salin konfigurasi opencode.json & antigravity.json
 CONFIG_DIR="$HOME/.config/opencode"
 mkdir -p "$CONFIG_DIR"
 if [ -f "$CONFIG_DIR/opencode.json" ]; then
     cp "$CONFIG_DIR/opencode.json" "$CONFIG_DIR/opencode.json.bak.$(date +%s)"
     echo "[*] Backup konfigurasi lama dibuat di $CONFIG_DIR/opencode.json.bak"
 fi
+if [ -f "$CONFIG_DIR/opencode.jsonc" ]; then
+    cp "$CONFIG_DIR/opencode.jsonc" "$CONFIG_DIR/opencode.jsonc.bak.$(date +%s)"
+    mv "$CONFIG_DIR/opencode.jsonc" "$CONFIG_DIR/opencode.jsonc.disabled"
+    echo "[*] Ditemukan opencode.jsonc lama; berhasil dibackup & dinonaktifkan agar tidak konflik."
+fi
 cp "$SCRIPT_DIR/config/opencode.json" "$CONFIG_DIR/opencode.json"
-echo "[+] Konfigurasi berhasil disalin ke: $CONFIG_DIR/opencode.json"
+echo "[+] Konfigurasi model berhasil disalin ke: $CONFIG_DIR/opencode.json"
+
+if [ -f "$SCRIPT_DIR/config/antigravity.json" ]; then
+    cp "$SCRIPT_DIR/config/antigravity.json" "$CONFIG_DIR/antigravity.json"
+    echo "[+] Konfigurasi tuning stabilitas berhasil disalin ke: $CONFIG_DIR/antigravity.json"
+fi
 
 # 5. Sinkronisasi token
 echo "[*] Menyinkronkan kredensial dari agy ke OpenCode..."
 python3 "$SCRIPT_DIR/scripts/sync-tokens.py"
 
-# 6. Terapkan compatibility patch (Gemini 3.1 Pro & Gemini 3.8 Flash)
-echo "[*] Menerapkan patch kompatibilitas model..."
+# 6. Terapkan compatibility & stability patch
+echo "[*] Menerapkan patch kompatibilitas model & stabilitas endpoint..."
 python3 "$SCRIPT_DIR/scripts/patch-model-resolver.py"
 
 echo ""
@@ -52,7 +62,8 @@ echo "[V] SELESAI! Setup integrasi OpenCode & Antigravity sukses."
 echo "========================================================="
 echo "Contoh penggunaan:"
 echo "  opencode                                              # Jalankan TUI"
-echo "  opencode run 'Halo dunia'                              # Default: Gemini 3.1 Pro"
-echo "  opencode run --model=google/antigravity-gemini-3.8-flash 'Halo' # Gemini 3.8 Flash"
-echo "  opencode run --model=google/antigravity-claude-sonnet-4-6 'Halo' # Claude Sonnet 4.6"
+echo "  opencode run 'Halo dunia'                              # Default model"
+echo "  opencode run -m google/antigravity-gemini-3.8-flash 'Halo' # Gemini 3.8 Flash (Responsif & Cepat)"
+echo "  opencode run -m google/antigravity-gemini-3.1-pro 'Analisa kode...' # Gemini 3.1 Pro (Deep Reasoning)"
+echo "  opencode run -m google/antigravity-claude-sonnet-4-6 'Halo' # Claude Sonnet 4.6"
 echo "========================================================="

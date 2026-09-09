@@ -1,0 +1,13 @@
+{
+  "$schema": "https://raw.githubusercontent.com/opencode-ai/antigravity/main/schema.json",
+  "debug": true,
+  "scheduling_mode": "cache_first",
+  "max_rate_limit_wait_seconds": 15,
+  "max_cache_first_wait_seconds": 10,
+  "empty_response_max_attempts": 2,
+  "empty_response_retry_delay_ms": 1000,
+  "failure_ttl_seconds": 600,
+  "switch_on_first_rate_limit": true,
+  "keep_thinking": false,
+  "session_recovery": true
+}
