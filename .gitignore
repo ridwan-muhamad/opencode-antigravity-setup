@@ -1,0 +1,7 @@
+# Node / OpenCode temporary logs and credentials
+antigravity-accounts.json
+*.log
+__pycache__/
+*.pyc
+.DS_Store
+*.bak*
